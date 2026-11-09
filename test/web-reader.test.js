@@ -95,7 +95,7 @@ test('createServer serves the page and a live frame', async () => {
     assert.equal(page.status, 200);
     assert.match(page.headers['content-type'], /text\/html/);
     assert.match(page.body, /code-with-quran/);
-    assert.match(page.body, /\/api\/frame/);
+    assert.match(page.body, /api\/frame/);
 
     const api = await get(port, '/api/frame');
     assert.equal(api.status, 200);
@@ -149,6 +149,31 @@ test('POST /api/move and /api/goto navigate; cross-origin writes are refused', a
     // a stray site is not
     assert.equal(
       (await req(port, 'POST', '/api/move?d=1', { origin: 'https://evil.example' })).status,
+      403
+    );
+    // the page opened through a proxy (e.g. tailscale serve) on its own host
+    assert.equal(
+      (
+        await req(port, 'POST', '/api/move?d=1', {
+          origin: 'https://reader.example.ts.net',
+          'x-forwarded-host': 'reader.example.ts.net',
+        })
+      ).status,
+      200
+    );
+    assert.equal(
+      (await req(port, 'POST', '/api/move?d=1', { origin: 'https://reader.example', host: 'reader.example' }))
+        .status,
+      200
+    );
+    // a stray site can't borrow that path
+    assert.equal(
+      (
+        await req(port, 'POST', '/api/move?d=1', {
+          origin: 'https://evil.example',
+          'x-forwarded-host': 'reader.example.ts.net',
+        })
+      ).status,
       403
     );
     // bad reference -> 400, pointer unchanged
@@ -212,5 +237,55 @@ test('serve scans upward when the preferred port is taken', async () => {
     await running;
   } finally {
     blocker.close();
+  }
+});
+
+/* ─── translation + transliteration ──────────────────────────────────── */
+
+test('frameData carries the verbatim translation and transliteration', () => {
+  setPos(2, 255);
+  const cur = web.frameData(1).ayat.find((a) => a.current);
+  const tr = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '..', 'data', 'translation-en-saheeh.json'), 'utf8')
+  );
+  assert.deepEqual(cur.translation, tr[2][254]);
+  assert.match(cur.translation.text, /^\(255\) Allāh - there is no deity except Him/);
+  assert.match(cur.translation.footnotes, /^\[98\]- /);
+  assert.match(cur.transliteration, /^Allahu la ilaha illa huwa alhayyu alqayyoomu/);
+});
+
+test('companion texts cover all 6236 ayat in mushaf order', () => {
+  const quran = require('../src/quran');
+  const read = (n) =>
+    JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', n), 'utf8'));
+  const tr = read('translation-en-saheeh.json');
+  const tl = read('transliteration-en.json');
+  let total = 0;
+  for (const s of quran.SURAHS) {
+    assert.equal(tr[s.number].length, s.ayahs, `translation ${s.number}`);
+    assert.equal(tl[s.number].length, s.ayahs, `transliteration ${s.number}`);
+    tr[s.number].forEach((a, i) => assert.match(a.text, new RegExp('^\\(' + (i + 1) + '\\) ')));
+    total += s.ayahs;
+  }
+  assert.equal(total, 6236);
+  assert.equal(qt.transliterationOf(112, 1), 'Qul huwa Allahu ahadun');
+});
+
+test('GET /api/surahs lists all 114 surahs', async () => {
+  const server = web.createServer();
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  try {
+    const list = JSON.parse((await get(port, '/api/surahs')).body);
+    assert.equal(list.length, 114);
+    assert.deepEqual(list[17], {
+      number: 18,
+      name: 'Al-Kahf',
+      meaning: list[17].meaning,
+      arabic: list[17].arabic,
+      ayahs: 110,
+    });
+  } finally {
+    server.close();
   }
 });

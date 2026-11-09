@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const http = require('http');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -46,6 +47,8 @@ function collectAyat(pos, span) {
       ayah: p.ayah,
       ref: `${p.surah}:${p.ayah}`,
       text: qt.ayahText(p.surah, p.ayah),
+      transliteration: qt.transliterationOf(p.surah, p.ayah),
+      translation: qt.translationOf(p.surah, p.ayah),
       numeral: qt.toArabicDigits(p.ayah),
       current: d === 0,
     });
@@ -104,169 +107,33 @@ function frameData(span = DEFAULT_SPAN) {
       total: quran.TOTAL_AYAT,
       percent: Math.round((idx / quran.TOTAL_AYAT) * 1000) / 10,
     },
+    credits: CREDITS,
   };
 }
 
 /* ─── the page ─────────────────────────────────────────────────────────── */
 
-const PAGE = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>code-with-quran</title>
-<style>
-  :root {
-    --bg: #faf8f3; --ink: #2b2621; --dim: #b6ac9b; --rule: #e7e0d2; --accent: #7d6f57;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #14120f; --ink: #ede6d8; --dim: #6b6353; --rule: #2a261f; --accent: #b7a374; }
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
-  body {
-    background: var(--bg); color: var(--ink);
-    font: 15px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
-    display: flex; flex-direction: column; align-items: center;
-    padding: 5vh 20px 4vh; min-height: 100%;
-  }
-  #wrap { width: 100%; max-width: 720px; margin: auto 0; text-align: center; }
-  header { color: var(--dim); font-size: 13px; letter-spacing: .02em; margin-bottom: 2.4rem; }
-  header .ar { font-size: 15px; color: var(--accent); }
-  .basmalah {
-    font-family: "SF Arabic", "Geeza Pro", "Noto Naskh Arabic", "Amiri", "Scheherazade New", serif;
-    direction: rtl; color: var(--dim); font-size: 1.3rem; margin-bottom: 2rem;
-  }
-  .ayah {
-    font-family: "SF Arabic", "Geeza Pro", "Noto Naskh Arabic", "Amiri", "Scheherazade New", "Traditional Arabic", serif;
-    direction: rtl; text-align: center; margin: 1.15rem 0;
-    color: var(--dim); font-size: 1.15rem; line-height: 2.05;
-    transition: color .4s, opacity .4s;
-  }
-  .ayah.current { color: var(--ink); font-size: 2rem; line-height: 2.1; margin: 1.9rem 0; }
-  .ayah .n {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 1.7em; height: 1.7em; padding: 0 .3em; margin: 0 .45em;
-    border: 1px solid var(--accent); border-radius: 999px;
-    font-size: .5em; line-height: 1; color: var(--accent);
-    vertical-align: .35em; unicode-bidi: isolate;
-  }
-  #ayat { transition: opacity .35s; }
-  footer { margin-top: 2.6rem; color: var(--dim); font-size: 12px; }
-  .meter { height: 3px; background: var(--rule); border-radius: 3px; overflow: hidden; margin: .8rem auto 0; max-width: 260px; }
-  .meter > i { display: block; height: 100%; background: var(--accent); transition: width .5s; }
-  .count { margin-top: .55rem; }
-  .keys { margin-top: .5rem; opacity: .8; }
-  .keys b { color: var(--accent); font-weight: 600; }
-  #follow { color: var(--accent); }
-  #follow.off { color: var(--dim); }
-  #wrap.stale { opacity: .4; }
-</style>
-</head>
-<body>
-<div id="wrap" aria-live="polite">
-  <header id="head"></header>
-  <div id="basmalah" class="basmalah" hidden></div>
-  <div id="ayat"></div>
-  <footer>
-    <div><span id="follow">● following</span> — each prompt moves one ayah</div>
-    <div class="meter"><i id="bar"></i></div>
-    <div class="count" id="count"></div>
-    <div class="keys"><b>j</b>/<b>k</b> move · <b>g</b> goto · <b>f</b> follow · <b>r</b> reload · <b>q</b> quit</div>
-  </footer>
-</div>
-<script>
-  var lastRef = null, missed = 0, following = true;
-  var $ = function (id) { return document.getElementById(id); };
+// The page lives in its own file so it can be edited as HTML. Read once at load.
+const PAGE = fs.readFileSync(path.join(__dirname, 'web-page.html'), 'utf8');
 
-  function esc(s) {
-    return String(s).replace(/[&<>]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
-    });
-  }
-
-  function render(d) {
-    var s = d.surah;
-    $('head').innerHTML =
-      '<span class="ar">' + esc(s.arabic) + '</span> &nbsp;·&nbsp; ' +
-      esc(s.name) + ' &nbsp;·&nbsp; ' + esc(s.meaning) + ' &nbsp;·&nbsp; ' + esc(s.revelationPlace);
-
-    var bas = $('basmalah');
-    if (d.basmalah) { bas.textContent = d.basmalah; bas.hidden = false; }
-    else { bas.hidden = true; }
-
-    var ayat = $('ayat');
-    ayat.style.opacity = 0;
-    ayat.innerHTML = d.ayat.map(function (a) {
-      return '<div class="ayah' + (a.current ? ' current' : '') + '">' +
-        esc(a.text) + '<span class="n">' + esc(a.numeral) + '</span></div>';
-    }).join('');
-    requestAnimationFrame(function () { ayat.style.opacity = 1; });
-
-    $('bar').style.width = d.progress.percent + '%';
-    $('count').textContent =
-      d.progress.index + ' / ' + d.progress.total + '  ·  ' + d.progress.percent + '%';
-    document.title = s.name + ' ' + d.ref + ' · code-with-quran';
-  }
-
-  function apply(d) { lastRef = d.ref; render(d); }
-
-  function poll() {
-    fetch('/api/frame', { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        missed = 0;
-        $('wrap').classList.remove('stale');
-        if (d.ref !== lastRef && following) apply(d);
-      })
-      .catch(function () {
-        if (++missed >= 3) $('wrap').classList.add('stale');
-      });
-  }
-
-  function nav(url) {
-    fetch(url, { method: 'POST' })
-      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-      .then(apply)
-      .catch(function () {});
-  }
-
-  function setFollow(on) {
-    following = on;
-    var el = $('follow');
-    el.textContent = on ? '● following' : '○ paused';
-    el.className = on ? '' : 'off';
-    if (on) poll();
-  }
-
-  document.addEventListener('keydown', function (e) {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    switch (e.key) {
-      case 'j': case 'ArrowRight': case 'ArrowDown': case ' ':
-        e.preventDefault(); nav('/api/move?d=1'); break;
-      case 'k': case 'ArrowLeft': case 'ArrowUp':
-        e.preventDefault(); nav('/api/move?d=-1'); break;
-      case 'g': {
-        e.preventDefault();
-        var ref = prompt('Go to (e.g. 2:255, Al-Kahf):');
-        if (ref) nav('/api/goto?ref=' + encodeURIComponent(ref.trim()));
-        break;
-      }
-      case 'f': e.preventDefault(); setFollow(!following); break;
-      case 'r': e.preventDefault(); poll(); break;
-      case 'q': case 'Escape': window.close(); break;
-    }
-  });
-
-  poll();
-  setInterval(poll, 2000);
-  document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) poll();
-  });
-</script>
-</body>
-</html>
-`;
+/** Where the companion texts come from, shown in the page's reading options. */
+const CREDITS = [
+  {
+    label: 'Arabic',
+    source: 'Tanzil Project, Uthmani',
+    url: 'https://tanzil.net/',
+  },
+  {
+    label: 'Translation',
+    source: 'Saheeh International, QuranEnc v1.1.2',
+    url: 'https://quranenc.com/en/browse/english_saheeh/',
+  },
+  {
+    label: 'Transliteration',
+    source: 'Tanzil Project',
+    url: 'https://tanzil.net/trans/en.transliteration',
+  },
+];
 
 /* ─── server ───────────────────────────────────────────────────────────── */
 
@@ -295,6 +162,16 @@ function createServer(opts = {}) {
     if (req.method === 'GET' && (pathname === '/' || pathname === '')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       res.end(PAGE);
+      return;
+    }
+    if (req.method === 'GET' && pathname === '/api/surahs') {
+      json(200, quran.SURAHS.map(({ number, name, meaning, arabic, ayahs }) => ({
+        number,
+        name,
+        meaning,
+        arabic,
+        ayahs,
+      })));
       return;
     }
     if (req.method === 'GET' && pathname === '/api/frame') {
@@ -332,11 +209,22 @@ function createServer(opts = {}) {
 }
 
 /** Reject a cross-site write (a stray page poking 127.0.0.1). Missing Origin = a
- *  direct/programmatic call, allowed; a present Origin must be loopback. */
+ *  direct/programmatic call, allowed. A present Origin must be loopback, or the
+ *  same host the request was addressed to (the page opened through a proxy such
+ *  as `tailscale serve`, which forwards to 127.0.0.1). A cross-site page can't
+ *  forge Host or X-Forwarded-Host, so this still refuses it. */
 function sameOrigin(req) {
   const o = req.headers.origin;
   if (!o) return true;
-  return /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(o);
+  if (/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(o)) return true;
+  let host;
+  try {
+    host = new URL(o).host;
+  } catch {
+    return false;
+  }
+  const fwd = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim();
+  return host === req.headers.host || (fwd !== '' && host === fwd);
 }
 
 /** Listen on the first free port at/above `start`. Resolves { server, port }. */

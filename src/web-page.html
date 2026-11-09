@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>code-with-quran</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --surface: #ffffff;
+    --ink: #1d1b18;
+    --ink-2: #57524a;
+    --ink-3: #8f887c;
+    --rule: rgba(29, 27, 24, .09);
+    --accent: #8a6d3b;
+    --accent-soft: rgba(138, 109, 59, .12);
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 28px rgba(0,0,0,.06);
+    --focus: #2f6feb;
+    --arabic: "KFGQPC HAFS Uthmanic Script", "Amiri Quran", "Scheherazade New", "SF Arabic", "Geeza Pro", "Noto Naskh Arabic", "Traditional Arabic", serif;
+    --serif: "New York", "Iowan Old Style", ui-serif, "Charter", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
+    --scale: 1;
+  }
+  :root[data-theme="dark"] {
+    --bg: #111110; --surface: #1a1918; --ink: #f2eee6; --ink-2: #bdb6a8; --ink-3: #7d776c;
+    --rule: rgba(242, 238, 230, .10); --accent: #d2b27a; --accent-soft: rgba(210, 178, 122, .14);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 32px rgba(0,0,0,.35); --focus: #79a6ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111110; --surface: #1a1918; --ink: #f2eee6; --ink-2: #bdb6a8; --ink-3: #7d776c;
+      --rule: rgba(242, 238, 230, .10); --accent: #d2b27a; --accent-soft: rgba(210, 178, 122, .14);
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 32px rgba(0,0,0,.35); --focus: #79a6ff;
+    }
+  }
+  :root[data-size="s"] { --scale: .88; }
+  :root[data-size="l"] { --scale: 1.16; }
+  :root[data-size="xl"] { --scale: 1.32; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.5 var(--sans);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 8px; }
+  [hidden] { display: none !important; }
+
+  /* progress hairline */
+  .progress { position: fixed; inset: 0 0 auto 0; height: 2px; background: var(--rule); z-index: 5; }
+  .progress > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .5s ease; }
+
+  /* top bar */
+  .bar {
+    position: sticky; top: 0; z-index: 4;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
+    background: color-mix(in srgb, var(--bg) 84%, transparent);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px);
+  }
+  .where {
+    display: inline-flex; align-items: baseline; gap: 10px; min-height: 44px; padding: 0 10px; margin-left: -10px;
+    border-radius: 12px; text-align: left;
+  }
+  .where:hover { background: var(--accent-soft); }
+  .where .name { font-weight: 600; letter-spacing: -.01em; }
+  .where .ref { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .where .ar { font-family: var(--arabic); color: var(--accent); font-size: 1.1rem; }
+  .tools { display: flex; gap: 4px; }
+  .icon {
+    width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: var(--ink-2);
+  }
+  .icon:hover { background: var(--accent-soft); color: var(--ink); }
+  .icon[aria-pressed="false"] { color: var(--ink-3); }
+  .icon svg { width: 20px; height: 20px; }
+
+  /* reading column */
+  main { flex: 1; width: 100%; max-width: 760px; margin: 0 auto; padding: 8px 20px 140px; }
+  #wrap.stale { opacity: .45; transition: opacity .3s; }
+  .basmalah {
+    font-family: var(--arabic); direction: rtl; text-align: center; color: var(--ink-2);
+    font-size: calc(1.55rem * var(--scale)); margin: 28px 0 8px;
+  }
+  .ayah {
+    display: block; width: 100%; text-align: center; padding: 18px 8px; border-radius: 18px;
+    color: var(--ink-3); transition: color .35s, background .35s, opacity .35s;
+  }
+  button.ayah:hover { background: var(--accent-soft); }
+  .ayah .ar {
+    font-family: var(--arabic); direction: rtl; display: block;
+    font-size: calc(1.3rem * var(--scale)); line-height: 2.1;
+  }
+  .ayah .tr, .ayah .en { display: block; margin-top: 6px; font-size: calc(.92rem * var(--scale)); }
+  .ayah .tr { font-style: italic; }
+  .ayah .en { font-family: var(--serif); }
+  .ayah:not(.current) .en, .ayah:not(.current) .tr {
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .ayah.current {
+    scroll-margin-top: 84px;
+    color: var(--ink); background: var(--surface); box-shadow: var(--shadow);
+    padding: 40px 32px 34px; margin: 18px 0;
+  }
+  .ayah.current .ar { font-size: calc(2.25rem * var(--scale)); line-height: 2.15; }
+  .ayah.current .tr { color: var(--ink-2); font-size: calc(1.06rem * var(--scale)); line-height: 1.6; margin-top: 22px; }
+  .ayah.current .en { color: var(--ink); font-size: calc(1.22rem * var(--scale)); line-height: 1.6; margin-top: 16px; text-wrap: pretty; }
+  .num {
+    display: inline-grid; place-items: center; min-width: 1.9em; height: 1.9em; padding: 0 .35em; margin: 0 .35em;
+    border: 1px solid currentColor; border-radius: 999px; opacity: .7;
+    font-family: var(--arabic); font-size: .52em; line-height: 1; vertical-align: .32em; unicode-bidi: isolate;
+  }
+  .current .num { color: var(--accent); opacity: 1; }
+  .hide-tr .tr, .hide-en .en, .hide-en .notes { display: none !important; }
+
+  sup.fn { line-height: 0; }
+  sup.fn button {
+    font-family: var(--sans); font-size: .62em; color: var(--accent); padding: 2px 3px; border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  sup.fn button:hover { background: var(--accent-soft); }
+  .notes {
+    margin: 18px auto 0; max-width: 560px; text-align: left; color: var(--ink-2);
+    font-size: calc(.9rem * var(--scale)); line-height: 1.55; border-top: 1px solid var(--rule); padding-top: 14px;
+  }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; margin-right: 6px; }
+
+  /* bottom controls */
+  .dock {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: max(18px, env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 999px; z-index: 4;
+    background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: var(--shadow);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  }
+  .dock .icon { border-radius: 999px; }
+  .dock .count { color: var(--ink-3); font-size: 13px; font-variant-numeric: tabular-nums; padding: 0 10px; min-width: 92px; text-align: center; }
+
+  /* sheets: view options, goto, keys */
+  dialog {
+    border: 0; padding: 0; border-radius: 20px; background: var(--surface); color: var(--ink);
+    box-shadow: 0 24px 80px rgba(0,0,0,.25); width: min(440px, calc(100vw - 32px));
+  }
+  dialog::backdrop { background: rgba(0,0,0,.28); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+  .sheet { padding: 20px; }
+  .sheet h2 { font-size: 15px; margin: 0 0 14px; font-weight: 600; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; border-bottom: 1px solid var(--rule); }
+  .row:last-child { border-bottom: 0; }
+  .switch { width: 48px; height: 30px; border-radius: 999px; background: var(--rule); position: relative; transition: background .2s; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+  .switch[aria-checked="true"] { background: var(--accent); }
+  .switch[aria-checked="true"]::after { transform: translateX(18px); }
+  .seg { display: inline-flex; background: var(--rule); border-radius: 10px; padding: 2px; }
+  .seg button { min-width: 44px; min-height: 32px; padding: 0 10px; border-radius: 8px; font-size: 13px; color: var(--ink-2); }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+  .credit { margin: 14px 0 0; font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+  .credit a { color: inherit; }
+
+  .search { width: 100%; font: inherit; font-size: 17px; padding: 14px 16px; border: 0; border-bottom: 1px solid var(--rule); background: transparent; color: var(--ink); outline: none; }
+  .results { list-style: none; margin: 0; padding: 6px; max-height: min(420px, 60vh); overflow: auto; }
+  .results li { display: flex; align-items: baseline; gap: 12px; padding: 10px 12px; border-radius: 10px; cursor: pointer; }
+  .results li[aria-selected="true"] { background: var(--accent-soft); }
+  .results .n { color: var(--ink-3); width: 2.2em; text-align: right; font-variant-numeric: tabular-nums; }
+  .results .nm { flex: 1; }
+  .results .ar { font-family: var(--arabic); color: var(--ink-2); }
+
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 10px 18px; font-size: 14px; margin: 0; }
+  .keys dt { text-align: right; }
+  .keys dd { margin: 0; color: var(--ink-2); }
+  kbd { font: 12px/1 var(--sans); padding: 4px 7px; border-radius: 6px; border: 1px solid var(--rule); background: var(--bg); }
+
+  .anim-in { animation: rise .38s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+  @media (max-width: 560px) {
+    main { padding: 0 12px 130px; }
+    .ayah.current { padding: 28px 18px 24px; }
+    .ayah.current .ar { font-size: calc(1.85rem * var(--scale)); }
+    .where .ar { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="progress" role="progressbar" aria-label="Progress through the Qur'an" aria-valuemin="0" aria-valuemax="6236" id="progress"><i id="bar"></i></div>
+
+<header class="bar">
+  <button class="where" id="where" aria-label="Go to a surah or ayah" aria-haspopup="dialog">
+    <span class="name" id="sname"></span>
+    <span class="ar" id="sar" lang="ar" dir="rtl"></span>
+    <span class="ref" id="sref"></span>
+  </button>
+  <div class="tools">
+    <button class="icon" id="follow" aria-pressed="true" aria-label="Follow Claude">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+    </button>
+    <button class="icon" id="viewBtn" aria-label="Reading options" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h7"/><path d="M17 15l2 4 2-4"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="wrap" aria-live="polite">
+  <div id="basmalah" class="basmalah" lang="ar" dir="rtl" hidden></div>
+  <div id="ayat"></div>
+</main>
+
+<nav class="dock" aria-label="Ayah navigation">
+  <button class="icon" id="prev" aria-label="Previous ayah">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+  </button>
+  <span class="count" id="count"></span>
+  <button class="icon" id="next" aria-label="Next ayah">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+  </button>
+</nav>
+
+<dialog id="view" aria-labelledby="viewTitle">
+  <div class="sheet">
+    <h2 id="viewTitle">Reading</h2>
+    <div class="row"><span id="lTr">Transliteration</span><button class="switch" role="switch" id="optTr" aria-labelledby="lTr"></button></div>
+    <div class="row"><span id="lEn">Translation</span><button class="switch" role="switch" id="optEn" aria-labelledby="lEn"></button></div>
+    <div class="row"><span id="lSize">Text size</span>
+      <div class="seg" role="group" aria-labelledby="lSize" id="optSize">
+        <button data-v="s" aria-label="Small">A</button><button data-v="m" aria-label="Medium">A</button><button data-v="l" aria-label="Large">A</button><button data-v="xl" aria-label="Extra large">A</button>
+      </div>
+    </div>
+    <div class="row"><span id="lTheme">Appearance</span>
+      <div class="seg" role="group" aria-labelledby="lTheme" id="optTheme">
+        <button data-v="auto">Auto</button><button data-v="light">Light</button><button data-v="dark">Dark</button>
+      </div>
+    </div>
+    <p class="credit" id="credit"></p>
+  </div>
+</dialog>
+
+<dialog id="goto" aria-label="Go to">
+  <input class="search" id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Surah or 2:255" aria-controls="results">
+  <ul class="results" id="results" role="listbox" aria-label="Surahs"></ul>
+</dialog>
+
+<dialog id="help" aria-labelledby="helpTitle">
+  <div class="sheet">
+    <h2 id="helpTitle">Keyboard</h2>
+    <dl class="keys">
+      <dt><kbd>j</kbd> <kbd>→</kbd></dt><dd>Next ayah</dd>
+      <dt><kbd>k</kbd> <kbd>←</kbd></dt><dd>Previous ayah</dd>
+      <dt><kbd>g</kbd></dt><dd>Go to</dd>
+      <dt><kbd>t</kbd></dt><dd>Transliteration</dd>
+      <dt><kbd>e</kbd></dt><dd>Translation</dd>
+      <dt><kbd>f</kbd></dt><dd>Follow Claude</dd>
+      <dt><kbd>r</kbd></dt><dd>Reload</dd>
+      <dt><kbd>?</kbd></dt><dd>This list</dd>
+    </dl>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var root = document.documentElement;
+  var lastRef = null, missed = 0, following = true, frame = null, surahs = null, credits = null;
+
+  /* ── preferences (per browser, best effort) ── */
+  var prefs = { tr: true, en: true, size: 'm', theme: 'auto' };
+  try { Object.assign(prefs, JSON.parse(localStorage.getItem('cwq.prefs') || '{}')); } catch (e) {}
+  function savePrefs() { try { localStorage.setItem('cwq.prefs', JSON.stringify(prefs)); } catch (e) {} }
+  function applyPrefs() {
+    root.setAttribute('data-size', prefs.size);
+    if (prefs.theme === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', prefs.theme);
+    $('wrap').classList.toggle('hide-tr', !prefs.tr);
+    $('wrap').classList.toggle('hide-en', !prefs.en);
+    $('optTr').setAttribute('aria-checked', String(prefs.tr));
+    $('optEn').setAttribute('aria-checked', String(prefs.en));
+    [['optSize', prefs.size], ['optTheme', prefs.theme]].forEach(function (p) {
+      Array.prototype.forEach.call($(p[0]).children, function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === p[1])); });
+    });
+  }
+  function toggle(key) { prefs[key] = !prefs[key]; savePrefs(); applyPrefs(); }
+
+  /* ── text helpers ── */
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
+  }
+  // QuranEnc text is stored verbatim. On screen: drop its "(n) " label (the
+  // page draws its own number) and make "[123]" a footnote link.
+  function translationHtml(t, withNotes) {
+    var body = esc(t.text.replace(/^\(\d+\)\s*/, ''));
+    return body.replace(/\[(\d+)\]/g, function (_, n) {
+      return withNotes
+        ? '<sup class="fn"><button data-fn="' + n + '" aria-label="Footnote ' + n + '" aria-expanded="false">' + n + '</button></sup>'
+        : '';
+    });
+  }
+  function notesHtml(t) {
+    if (!t.footnotes) return '';
+    return t.footnotes.split('\n').map(function (line) {
+      var m = line.match(/^\[(\d+)\]-?\s*([\s\S]*)$/);
+      return m ? '<p id="fn-' + m[1] + '" hidden><b>' + m[1] + '</b>' + esc(m[2]) + '</p>' : '';
+    }).join('');
+  }
+
+  function ayahHtml(a, offset) {
+    var inner =
+      '<span class="ar" lang="ar" dir="rtl">' + esc(a.text) + '<span class="num">' + esc(a.numeral) + '</span></span>' +
+      (a.transliteration ? '<span class="tr">' + esc(a.transliteration) + '</span>' : '') +
+      (a.translation ? '<span class="en">' + translationHtml(a.translation, a.current) + '</span>' : '');
+    if (a.current) {
+      return '<article class="ayah current anim-in" aria-label="Ayah ' + esc(a.ref) + '">' + inner +
+        (a.translation && a.translation.footnotes ? '<div class="notes">' + notesHtml(a.translation) + '</div>' : '') +
+        '</article>';
+    }
+    return '<button class="ayah" data-offset="' + offset + '" aria-label="Go to ayah ' + esc(a.ref) + '">' + inner + '</button>';
+  }
+
+  function render(d) {
+    frame = d;
+    var s = d.surah;
+    $('sname').textContent = s.name;
+    $('sar').textContent = s.arabic;
+    $('sref').textContent = d.ref;
+    var bas = $('basmalah');
+    if (d.basmalah) { bas.textContent = d.basmalah; bas.hidden = false; } else { bas.hidden = true; }
+    var ci = d.ayat.findIndex(function (a) { return a.current; });
+    // one ayah of context above, the rest below: the current one stays near the top
+    $('ayat').innerHTML = d.ayat.map(function (a, i) {
+      return i < ci - 1 ? '' : ayahHtml(a, i - ci);
+    }).join('');
+    var cur = document.querySelector('.ayah.current');
+    if (cur) {
+      var r = cur.getBoundingClientRect();
+      if (r.top < 64 || r.top > window.innerHeight * 0.45) {
+        cur.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      }
+    }
+    var notes = document.querySelector('.ayah.current .notes');
+    if (notes) notes.hidden = true;
+    $('bar').style.width = d.progress.percent + '%';
+    $('progress').setAttribute('aria-valuenow', d.progress.index);
+    $('count').textContent = d.progress.percent + '%';
+    $('count').setAttribute('aria-label', d.progress.index + ' of ' + d.progress.total + ' ayat');
+    document.title = s.name + ' ' + d.ref;
+    if (d.credits && !credits) {
+      credits = d.credits;
+      $('credit').innerHTML = credits.map(function (c) {
+        return esc(c.label) + ': <a href="' + esc(c.url) + '" target="_blank" rel="noopener">' + esc(c.source) + '</a>';
+      }).join('<br>');
+    }
+  }
+
+  function apply(d) { lastRef = d.ref; render(d); }
+
+  /* ── server ── */
+  var SPAN = 2;
+  function poll() {
+    fetch('api/frame?span=' + SPAN, { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        missed = 0;
+        $('wrap').classList.remove('stale');
+        if (d.ref !== lastRef && following) apply(d);
+      })
+      .catch(function () { if (++missed >= 3) $('wrap').classList.add('stale'); });
+  }
+  function nav(url) {
+    fetch(url + (url.indexOf('?') < 0 ? '?' : '&') + 'span=' + SPAN, { method: 'POST' })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(apply)
+      .catch(function () {});
+  }
+  function move(d) { nav('api/move?d=' + d); }
+
+  function setFollow(on) {
+    following = on;
+    $('follow').setAttribute('aria-pressed', String(on));
+    if (on) poll();
+  }
+
+  /* ── go to ── */
+  var sel = 0, shown = [];
+  function openGoto() {
+    if (!surahs) {
+      fetch('api/surahs').then(function (r) { return r.json(); }).then(function (l) { surahs = l; filter(); });
+    }
+    $('q').value = '';
+    filter();
+    $('goto').showModal();
+    $('q').focus();
+  }
+  function norm(s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+  function filter() {
+    if (!surahs) return;
+    var q = $('q').value.trim(), nq = norm(q);
+    var ref = q.match(/^(\d{1,3})(?:\s*[:. ]\s*(\d{1,3}))?$/);
+    shown = surahs.filter(function (s) {
+      if (!q) return true;
+      if (ref) return String(s.number) === ref[1];
+      return norm(s.name).indexOf(nq) >= 0 || norm(s.meaning).indexOf(nq) >= 0 || norm(s.name).replace(/^(al|an|ar|as|at|ad|az|ash)/, '').indexOf(nq) === 0;
+    }).slice(0, 114);
+    sel = 0;
+    $('results').innerHTML = shown.map(function (s, i) {
+      var tail = ref && ref[2] ? ':' + ref[2] : '';
+      return '<li role="option" id="opt-' + i + '" aria-selected="' + (i === 0) + '" data-ref="' + s.number + tail + '">' +
+        '<span class="n">' + s.number + tail + '</span><span class="nm">' + esc(s.name) + '</span>' +
+        '<span class="ar" lang="ar" dir="rtl">' + esc(s.arabic) + '</span></li>';
+    }).join('');
+    $('q').setAttribute('aria-activedescendant', shown.length ? 'opt-0' : '');
+  }
+  function pick(ref) { $('goto').close(); nav('api/goto?ref=' + encodeURIComponent(ref)); }
+  function highlight(i) {
+    var items = $('results').children;
+    if (!items.length) return;
+    sel = (i + items.length) % items.length;
+    Array.prototype.forEach.call(items, function (li, j) { li.setAttribute('aria-selected', String(j === sel)); });
+    items[sel].scrollIntoView({ block: 'nearest' });
+    $('q').setAttribute('aria-activedescendant', 'opt-' + sel);
+  }
+  $('q').addEventListener('input', filter);
+  $('q').addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); highlight(sel + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(sel - 1); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      var li = $('results').children[sel];
+      if (li) pick(li.dataset.ref); else if ($('q').value.trim()) pick($('q').value.trim());
+    }
+  });
+  $('results').addEventListener('click', function (e) {
+    var li = e.target.closest('li');
+    if (li) pick(li.dataset.ref);
+  });
+
+  /* ── wiring ── */
+  $('where').addEventListener('click', openGoto);
+  $('viewBtn').addEventListener('click', function () { $('view').showModal(); });
+  $('follow').addEventListener('click', function () { setFollow(!following); });
+  $('prev').addEventListener('click', function () { move(-1); });
+  $('next').addEventListener('click', function () { move(1); });
+  $('optTr').addEventListener('click', function () { toggle('tr'); });
+  $('optEn').addEventListener('click', function () { toggle('en'); });
+  ['optSize', 'optTheme'].forEach(function (id) {
+    $(id).addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      prefs[id === 'optSize' ? 'size' : 'theme'] = b.dataset.v;
+      savePrefs(); applyPrefs();
+    });
+  });
+  // tap outside a sheet closes it
+  Array.prototype.forEach.call(document.querySelectorAll('dialog'), function (dlg) {
+    dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
+  });
+  $('ayat').addEventListener('click', function (e) {
+    var fn = e.target.closest('[data-fn]');
+    if (fn) {
+      var note = $('fn-' + fn.dataset.fn);
+      if (!note) return;
+      var open = note.hidden;
+      note.hidden = !open;
+      fn.setAttribute('aria-expanded', String(open));
+      var box = note.parentNode;
+      box.hidden = !box.querySelector('p:not([hidden])');
+      return;
+    }
+    var a = e.target.closest('button.ayah');
+    if (a) move(Number(a.dataset.offset));
+  });
+
+  // swipe on touch screens: left = next, right = previous
+  var sx = null, sy = null;
+  document.addEventListener('touchstart', function (e) { var t = e.touches[0]; sx = t.clientX; sy = t.clientY; }, { passive: true });
+  document.addEventListener('touchend', function (e) {
+    if (sx === null || document.querySelector('dialog[open]')) return;
+    var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    sx = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) move(dx < 0 ? 1 : -1);
+  }, { passive: true });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey || document.querySelector('dialog[open]')) return;
+    switch (e.key) {
+      case 'j': case 'ArrowRight': case 'ArrowDown': case ' ': e.preventDefault(); move(1); break;
+      case 'k': case 'ArrowLeft': case 'ArrowUp': e.preventDefault(); move(-1); break;
+      case 'g': case '/': e.preventDefault(); openGoto(); break;
+      case 't': e.preventDefault(); toggle('tr'); break;
+      case 'e': e.preventDefault(); toggle('en'); break;
+      case 'f': e.preventDefault(); setFollow(!following); break;
+      case 'r': e.preventDefault(); lastRef = null; poll(); break;
+      case '?': e.preventDefault(); $('help').showModal(); break;
+      case 'q': window.close(); break;
+    }
+  });
+
+  applyPrefs();
+  poll();
+  setInterval(poll, 2000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+})();
+</script>
+</body>
+</html>
