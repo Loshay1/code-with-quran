@@ -36,4 +36,52 @@ function toArabicDigits(n) {
   return String(n).replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[Number(d)]);
 }
 
-module.exports = { BASMALAH, ayahText, hasOpeningBasmalah, toArabicDigits };
+/*
+ * Companion texts (translation, transliteration). Loaded on first use so the
+ * hook path, which only moves the pointer, never pays to parse them.
+ * See data/COMPANION-TEXT-LICENSE.txt.
+ */
+const companions = {};
+function companion(name) {
+  if (!(name in companions)) {
+    try {
+      companions[name] = JSON.parse(
+        fs.readFileSync(path.join(__dirname, '..', 'data', name), 'utf8')
+      );
+    } catch {
+      companions[name] = null;
+    }
+  }
+  return companions[name];
+}
+
+/**
+ * Saheeh International translation of one ayah, verbatim from QuranEnc.
+ * @returns {{ text: string, footnotes?: string } | null}
+ */
+function translationOf(surah, ayah) {
+  const data = companion('translation-en-saheeh.json');
+  if (!data) return null;
+  const pos = clampPosition({ surah, ayah });
+  return data[pos.surah][pos.ayah - 1] || null;
+}
+
+/**
+ * Tanzil English transliteration of one ayah, verbatim.
+ * @returns {string | null}
+ */
+function transliterationOf(surah, ayah) {
+  const data = companion('transliteration-en.json');
+  if (!data) return null;
+  const pos = clampPosition({ surah, ayah });
+  return data[pos.surah][pos.ayah - 1] || null;
+}
+
+module.exports = {
+  BASMALAH,
+  ayahText,
+  hasOpeningBasmalah,
+  toArabicDigits,
+  translationOf,
+  transliterationOf,
+};

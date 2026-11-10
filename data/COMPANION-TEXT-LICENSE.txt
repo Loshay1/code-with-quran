@@ -1,0 +1,44 @@
+Companion texts shown with the Qur'an in the browser reader.
+Both are copied verbatim by scripts/build-companions.js. Nothing is added,
+removed or changed; the reader only formats them on screen (it hides the
+"(n) " verse label in the translation and renders "[n]" as a footnote link).
+
+The Qur'an itself is the Tanzil Uthmani text: see QURAN-TEXT-LICENSE.txt.
+
+--------------------------------------------------------------------
+translation-en-saheeh.json
+
+Translation: Saheeh International, English
+Publisher listing: QuranEnc.com (The Noble Qur'an Encyclopedia),
+  key "english_saheeh", version 1.1.2
+  https://quranenc.com/en/browse/english_saheeh/
+Snapshot used: github.com/risan/quran-json, data/quranenc/english_saheeh.json
+  (revision e20bba6abe2cc37f77f5aae5266f39cc55b9ca77,
+   sha256 c12b5bed64837cb744e075fdd3b79f885aee1522d92468f36c38ff565bfdc439),
+  taken from https://quranenc.com/downloads/sqlite/english_saheeh.zip
+
+Terms (https://quranenc.com/en/home/api): QuranEnc permits download and
+re-publication of translation contents on these conditions: no
+modification, addition or deletion; credit the publisher and QuranEnc.com;
+state the version number; keep the transcript information; report notes
+back to QuranEnc; keep up to date with the latest version; no
+inappropriate advertising.
+
+--------------------------------------------------------------------
+transliteration-en.json  (offline fallback)
+
+When online, the reader shows the Quran.com word-by-word transliteration
+instead, fetched live per surah by src/qurancom.js and held in memory only.
+It is never bundled or written to disk: Quran Foundation's developer terms
+(https://api-docs.quran.foundation/legal/developer-terms, updated
+2026-10-11) forbid redistributing its content as a dataset or build-time
+bundle and storing it for more than a week.
+
+Transliteration: Tanzil Project, English transliteration
+  (en.transliteration), https://tanzil.net/trans/en.transliteration
+Snapshot used: npm quran-json@3.1.2, dist/quran_transliteration.json
+  (dataset by Risan Bagja Pradana, CC BY-SA 4.0)
+
+Terms: Tanzil publishes its translations and transliterations for
+non-commercial use. Commercial use needs permission from the publisher.
+Check https://tanzil.net/trans/ for current terms.

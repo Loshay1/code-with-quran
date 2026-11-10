@@ -95,6 +95,8 @@ page**:
 | `g` | jump to a reference (`2:255`, `Al-Kahf`, `baqarah 255`) |
 | `f` | follow on/off (whether the view jumps when Claude advances) |
 | `r` | reload from disk |
+| `t` / `e` | browser only: show or hide transliteration / translation |
+| `?` | browser only: list the keys |
 | `q` / `Esc` | quit (a browser tab may need a manual close) |
 
 ### From anywhere
@@ -128,6 +130,10 @@ code-with-quran config surface web       # browser reader — best under tmux/ze
 code-with-quran config surface both      # terminal pane *and* the browser page
 code-with-quran config surface browser   # an external site (quran.com etc.), a tab per advance
 ```
+
+The browser page shows each ayah with its transliteration and the Saheeh
+International translation (footnotes on tap), and has text size and light/dark
+options. It works on a phone too: swipe or use the arrows.
 
 The browser page binds `127.0.0.1` only, opens one tab, follows the pointer, and
 shuts itself down a few minutes after you close the tab.
@@ -232,6 +238,16 @@ Three moving parts:
 - `data/surahs.json` — 114 surahs: names (transliterated + Arabic), meanings,
   ayah counts, revelation place.
 
+- `data/translation-en-saheeh.json` — Saheeh International, QuranEnc
+  `english_saheeh` v1.1.2, verbatim with its footnotes.
+- `data/transliteration-en.json` — Tanzil English transliteration, verbatim. Used
+  offline; when online the page shows the Quran.com transliteration, fetched live
+  and kept in memory only (its terms forbid bundling it).
+
+Sources and terms for both: [`data/COMPANION-TEXT-LICENSE.txt`](data/COMPANION-TEXT-LICENSE.txt).
+To rebuild: `node scripts/build-companions.js <english_saheeh.json> <quran_transliteration.json>`
+(input locations are in the script header).
+
 Text: **Tanzil Project** (Uthmani), CC BY 3.0, retrieved via
 [alquran.cloud](https://alquran.cloud). See
 [`data/QURAN-TEXT-LICENSE.txt`](data/QURAN-TEXT-LICENSE.txt). To rebuild:
@@ -254,7 +270,9 @@ npm test          # node:test — no network, no browser, no rc files touched
 | `arabic.js` | Zero-dep Arabic shaping + visual reordering for a bare terminal with no bidi |
 | `render.js` | Pure frame builder for the terminal reader (width-aware Arabic wrapping) |
 | `tui.js` | The terminal reader loop: raw input, state-file watch, alt-screen |
-| `web-reader.js` | The browser reader: local HTTP server + self-contained page |
+| `web-reader.js` | The browser reader: local HTTP server and JSON API |
+| `qurancom.js` | Live Quran.com transliteration, memory-only cache |
+| `web-page.html` | The browser page: translation, transliteration, options, go-to |
 | `pane.js` | Split a reader pane in tmux / zellij (deduped) |
 | `state.js` / `config.js` | JSON persistence under `~/.code-with-quran/` |
 | `session.js` | The `CODE_WITH_QURAN` activation gate |
@@ -266,4 +284,6 @@ npm test          # node:test — no network, no browser, no rc files touched
 
 ## License
 
-Code: [MIT](LICENSE). Qur'an text: CC BY 3.0 (Tanzil Project).
+Code: [MIT](LICENSE). Qur'an text: CC BY 3.0 (Tanzil Project). Translation:
+Saheeh International via QuranEnc (verbatim republication with credit).
+Transliteration: Quran.com live (personal use), Tanzil Project offline (non-commercial).
