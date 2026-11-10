@@ -25,7 +25,14 @@ back to QuranEnc; keep up to date with the latest version; no
 inappropriate advertising.
 
 --------------------------------------------------------------------
-transliteration-en.json
+transliteration-en.json  (offline fallback)
+
+When online, the reader shows the Quran.com word-by-word transliteration
+instead, fetched live per surah by src/qurancom.js and held in memory only.
+It is never bundled or written to disk: Quran Foundation's developer terms
+(https://api-docs.quran.foundation/legal/developer-terms, updated
+2026-10-11) forbid redistributing its content as a dataset or build-time
+bundle and storing it for more than a week.
 
 Transliteration: Tanzil Project, English transliteration
   (en.transliteration), https://tanzil.net/trans/en.transliteration

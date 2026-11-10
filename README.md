@@ -240,7 +240,9 @@ Three moving parts:
 
 - `data/translation-en-saheeh.json` — Saheeh International, QuranEnc
   `english_saheeh` v1.1.2, verbatim with its footnotes.
-- `data/transliteration-en.json` — Tanzil English transliteration, verbatim.
+- `data/transliteration-en.json` — Tanzil English transliteration, verbatim. Used
+  offline; when online the page shows the Quran.com transliteration, fetched live
+  and kept in memory only (its terms forbid bundling it).
 
 Sources and terms for both: [`data/COMPANION-TEXT-LICENSE.txt`](data/COMPANION-TEXT-LICENSE.txt).
 To rebuild: `node scripts/build-companions.js <english_saheeh.json> <quran_transliteration.json>`
@@ -269,6 +271,7 @@ npm test          # node:test — no network, no browser, no rc files touched
 | `render.js` | Pure frame builder for the terminal reader (width-aware Arabic wrapping) |
 | `tui.js` | The terminal reader loop: raw input, state-file watch, alt-screen |
 | `web-reader.js` | The browser reader: local HTTP server and JSON API |
+| `qurancom.js` | Live Quran.com transliteration, memory-only cache |
 | `web-page.html` | The browser page: translation, transliteration, options, go-to |
 | `pane.js` | Split a reader pane in tmux / zellij (deduped) |
 | `state.js` / `config.js` | JSON persistence under `~/.code-with-quran/` |
@@ -283,4 +286,4 @@ npm test          # node:test — no network, no browser, no rc files touched
 
 Code: [MIT](LICENSE). Qur'an text: CC BY 3.0 (Tanzil Project). Translation:
 Saheeh International via QuranEnc (verbatim republication with credit).
-Transliteration: Tanzil Project (non-commercial).
+Transliteration: Quran.com live (personal use), Tanzil Project offline (non-commercial).

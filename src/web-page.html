@@ -310,7 +310,7 @@
   function ayahHtml(a, offset) {
     var inner =
       '<span class="ar" lang="ar" dir="rtl">' + esc(a.text) + '<span class="num">' + esc(a.numeral) + '</span></span>' +
-      (a.transliteration ? '<span class="tr">' + esc(a.transliteration) + '</span>' : '') +
+      (a.transliteration ? '<span class="tr">' + esc(liveTr(a) || a.transliteration) + '</span>' : '') +
       (a.translation ? '<span class="en">' + translationHtml(a.translation, a.current) + '</span>' : '');
     if (a.current) {
       return '<article class="ayah current anim-in" aria-label="Ayah ' + esc(a.ref) + '">' + inner +
@@ -355,7 +355,25 @@
     }
   }
 
-  function apply(d) { lastRef = d.ref; render(d); }
+  function apply(d) { lastRef = d.ref; render(d); loadLive(d); }
+
+  /* ── live Quran.com transliteration (memory only; Tanzil when offline) ── */
+  var live = {}, asked = {};
+  function liveTr(a) { var l = live[a.surah]; return l ? l[a.ayah - 1] : null; }
+  function loadLive(d) {
+    var need = {};
+    d.ayat.forEach(function (a) { if (!live[a.surah] && !asked[a.surah]) need[a.surah] = true; });
+    Object.keys(need).forEach(function (n) {
+      asked[n] = true;
+      fetch('api/transliteration?surah=' + n)
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function (res) {
+          if (!res.ayat) return Promise.reject();
+          live[n] = res.ayat; if (frame) render(frame);
+        })
+        .catch(function () { setTimeout(function () { delete asked[n]; }, 60000); });
+    });
+  }
 
   /* ── server ── */
   var SPAN = 2;

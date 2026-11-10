@@ -289,3 +289,52 @@ test('GET /api/surahs lists all 114 surahs', async () => {
     server.close();
   }
 });
+
+/* ─── live Quran.com transliteration ─────────────────────────────────── */
+
+test('GET /api/transliteration fetches Quran.com live, in memory, and falls back offline', async () => {
+  const qc = require('../src/qurancom');
+  qc.clearCache();
+  const calls = [];
+  const word = (t) => ({ char_type_name: 'word', transliteration: { text: t } });
+  const fakeFetch = async (url) => {
+    calls.push(url);
+    return {
+      ok: true,
+      json: async () => ({
+        verses: [1, 2, 3, 4].map((a) => ({
+          verse_key: `112:${a}`,
+          words: [word('w' + a), word('x'), { char_type_name: 'end', transliteration: { text: '(1)' } }],
+        })),
+      }),
+    };
+  };
+  const server = web.createServer({ fetch: fakeFetch });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  try {
+    const res = await get(port, '/api/transliteration?surah=112');
+    assert.equal(res.status, 200);
+    assert.deepEqual(JSON.parse(res.body).ayat, ['w1 x', 'w2 x', 'w3 x', 'w4 x']);
+    await get(port, '/api/transliteration?surah=112');
+    assert.equal(calls.length, 1, 'second request served from memory');
+    assert.match(calls[0], /api\.quran\.com\/api\/v4\/verses\/by_chapter\/112\?words=true/);
+    assert.equal((await get(port, '/api/transliteration?surah=0')).status, 400);
+  } finally {
+    server.close();
+  }
+
+  qc.clearCache();
+  const offline = web.createServer({ fetch: async () => { throw new Error('offline'); } });
+  await new Promise((r) => offline.listen(0, '127.0.0.1', r));
+  try {
+    const res = await get(offline.address().port, '/api/transliteration?surah=1');
+    assert.equal(res.status, 200);
+    assert.equal(JSON.parse(res.body).source, 'tanzil');
+    assert.equal(JSON.parse(res.body).ayat, null);
+  } finally {
+    offline.close();
+  }
+  // nothing about Quran.com is written to disk
+  assert.ok(!fs.readdirSync(process.env.CODE_WITH_QURAN_HOME).some((f) => /quran\.?com/i.test(f)));
+});

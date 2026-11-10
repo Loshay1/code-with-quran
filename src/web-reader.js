@@ -11,6 +11,7 @@ const { loadState, saveState, position } = require('./state');
 const { loadConfig } = require('./config');
 const { openUrl } = require('./open');
 const registry = require('./web-registry');
+const qurancom = require('./qurancom');
 
 /*
  * The bundled web reader.
@@ -130,8 +131,8 @@ const CREDITS = [
   },
   {
     label: 'Transliteration',
-    source: 'Tanzil Project',
-    url: 'https://tanzil.net/trans/en.transliteration',
+    source: 'Quran.com, live (Tanzil Project offline)',
+    url: 'https://quran.com/',
   },
 ];
 
@@ -139,7 +140,8 @@ const CREDITS = [
 
 /**
  * Build the reader's HTTP server (not yet listening).
- * @param {{ span?: number, onHit?: () => void }} [opts]
+ * @param {{ span?: number, onHit?: () => void, fetch?: typeof fetch }} [opts]
+ *   `fetch` replaces the network call for the live Quran.com transliteration (tests).
  * @returns {import('http').Server}
  */
 function createServer(opts = {}) {
@@ -162,6 +164,17 @@ function createServer(opts = {}) {
     if (req.method === 'GET' && (pathname === '/' || pathname === '')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       res.end(PAGE);
+      return;
+    }
+    if (req.method === 'GET' && pathname === '/api/transliteration') {
+      const m = query.match(/(?:^|&)surah=(\d+)/);
+      const n = m ? parseInt(m[1], 10) : 0;
+      if (n < 1 || n > quran.TOTAL_SURAHS) return json(400, { error: 'bad surah' });
+      qurancom
+        .surahTransliteration(n, { ayahs: quran.surah(n).ayahs, fetch: opts.fetch })
+        .then((ayat) => json(200, { surah: n, source: 'quran.com', ayat }))
+        // 200 with no ayat: the page keeps the bundled Tanzil text (no console noise offline)
+        .catch((err) => json(200, { surah: n, source: 'tanzil', ayat: null, error: String(err && err.message) }));
       return;
     }
     if (req.method === 'GET' && pathname === '/api/surahs') {
